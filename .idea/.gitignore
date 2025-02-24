@@ -1,0 +1,36 @@
+# Go binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go object files
+*.a
+*.o
+
+# Go build directories
+/bin/
+/obj/
+
+# Dependency directories (remove if you use Go Modules)
+vendor/
+
+# Test coverage output
+*.out
+
+# IDE or editor specific files
+.vscode/
+.idea/
+*.iml
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Go Modules file (if you use it)
+go.sum
+go.mod
+
+# .env file (for environment variables)
+.env
