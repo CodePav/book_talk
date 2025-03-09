@@ -2,13 +2,13 @@ package users
 
 import (
 	"book_talk/internal/models"
-	"bytes"
 	"database/sql"
 	"errors"
 	"fmt"
 	"golang.org/x/crypto/bcrypt"
-	"image"
 	"log"
+	"mime"
+	"net/http"
 	"os"
 )
 
@@ -459,27 +459,6 @@ func (s *Service) GetUserImage(email string) (*models.Response, error) {
 
 // UpdateUserImage обновляет изображение пользователя
 func (s *Service) UpdateUserImage(imageData []byte, email string) (*models.Response, error) {
-	// Проверяем, существует ли пользователь
-	var exists bool
-	err := s.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)`, email).Scan(&exists)
-	if err != nil {
-		return &models.Response{
-			Success:           false,
-			Message:           "Failed to check user existence",
-			Data:              nil,
-			ErrorsDescription: fmt.Sprintf("Error checking user existence: %v", err),
-		}, err
-	}
-
-	if !exists {
-		return &models.Response{
-			Success:           false,
-			Message:           "User not found",
-			Data:              nil,
-			ErrorsDescription: "No user found with the specified email",
-		}, fmt.Errorf("user not found")
-	}
-
 	// Проверяем, что данные не пустые
 	if len(imageData) == 0 {
 		return &models.Response{
@@ -490,30 +469,21 @@ func (s *Service) UpdateUserImage(imageData []byte, email string) (*models.Respo
 		}, fmt.Errorf("empty image data")
 	}
 
-	// Проверяем, является ли файл изображением
-	_, format, err := image.Decode(bytes.NewReader(imageData))
-	if err != nil {
-		return &models.Response{
-			Success:           false,
-			Message:           "Invalid image format",
-			Data:              nil,
-			ErrorsDescription: "Uploaded file is not a valid image",
-		}, fmt.Errorf("invalid image format")
-	}
-
-	// Разрешенные форматы (можно расширить)
-	allowedFormats := map[string]bool{"jpeg": true, "png": true}
-	if !allowedFormats[format] {
+	// Проверка MIME-типа изображения
+	contentType := http.DetectContentType(imageData)
+	allowedFormats := map[string]bool{"image/jpeg": true, "image/png": true}
+	if !allowedFormats[contentType] {
 		return &models.Response{
 			Success:           false,
 			Message:           "Unsupported image format",
 			Data:              nil,
-			ErrorsDescription: fmt.Sprintf("Only JPEG and PNG formats are allowed, got: %s", format),
-		}, fmt.Errorf("unsupported image format: %s", format)
+			ErrorsDescription: fmt.Sprintf("Only JPEG and PNG formats are allowed, got: %s", contentType),
+		}, fmt.Errorf("unsupported image format: %s", contentType)
 	}
 
 	// Формируем путь для изображения
-	imagePath := fmt.Sprintf("images/%s.%s", email, format)
+	_, format := mime.ExtensionsByType(contentType)
+	imagePath := fmt.Sprintf("images/%s%s", email, format)
 
 	// Создаем директорию, если её нет
 	if err := os.MkdirAll("images", 0755); err != nil {
@@ -526,7 +496,7 @@ func (s *Service) UpdateUserImage(imageData []byte, email string) (*models.Respo
 	}
 
 	// Записываем изображение на диск
-	err = os.WriteFile(imagePath, imageData, 0644)
+	err := os.WriteFile(imagePath, imageData, 0644)
 	if err != nil {
 		return &models.Response{
 			Success:           false,
@@ -536,9 +506,25 @@ func (s *Service) UpdateUserImage(imageData []byte, email string) (*models.Respo
 		}, err
 	}
 
-	// Обновляем путь к изображению в базе данных
-	_, err = s.DB.Exec(`UPDATE users SET image = $1 WHERE email = $2`, imagePath, email)
+	// Обновляем изображение в базе данных и получаем путь к изображению, если пользователь существует
+	var updatedEmail string
+	err = s.DB.QueryRow(`
+		UPDATE users 
+		SET image = $1
+		WHERE email = $2
+		RETURNING email
+	`, imagePath, email).Scan(&updatedEmail)
+
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return &models.Response{
+				Success:           false,
+				Message:           "User not found",
+				Data:              nil,
+				ErrorsDescription: "No user found with the specified email",
+			}, err
+		}
+
 		return &models.Response{
 			Success:           false,
 			Message:           "Failed to update image path in database",
