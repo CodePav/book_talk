@@ -2,8 +2,6 @@ package users
 
 import (
 	"book_talk/internal/models"
-	"github.com/mitchellh/mapstructure"
-
 	"bytes"
 	"database/sql"
 	"errors"
@@ -23,60 +21,83 @@ func NewUsersService(db *sql.DB) *Service {
 }
 
 func (s *Service) GetAllUsers() (*models.Response, error) {
-	// Получаем список email'ов пользователей
-	query := `SELECT email FROM users`
+	query := `
+		SELECT u.email, u.first_name, u.last_name, u.image, u.theme, 
+			   u.credentials_non_expired, u.account_non_expired, 
+			   u.account_non_locked, u.enabled, 
+			   b.id, b.time, r.id, r.authority 
+		FROM users u
+		LEFT JOIN booking b ON u.email = b.user_email
+		LEFT JOIN role ur ON u.email = ur.user_email
+		LEFT JOIN role r ON ur.id = r.id
+		ORDER BY u.email
+	`
+
 	rows, err := s.DB.Query(query)
 	if err != nil {
 		return &models.Response{
 			Success:           false,
-			Message:           "Error fetching user emails",
-			ErrorsDescription: fmt.Sprintf("error fetching user emails: %v", err),
+			Message:           "Error fetching users",
+			ErrorsDescription: fmt.Sprintf("error fetching users: %v", err),
 		}, err
 	}
 	defer rows.Close()
 
-	var users []models.UserResponse
-	var email string
+	userMap := make(map[string]*models.UserResponse)
 
-	// Обходим все email'ы и вызываем GetUser
 	for rows.Next() {
-		if err := rows.Scan(&email); err != nil {
+		var email, firstName, lastName, theme string
+		var imageValue sql.NullString
+		var credentialsNonExpired, accountNonExpired, accountNonLocked, enabled bool
+		var bookingID, roleID *int
+		var bookingDate, roleName *string
+
+		if err := rows.Scan(&email, &firstName, &lastName, &imageValue, &theme,
+			&credentialsNonExpired, &accountNonExpired,
+			&accountNonLocked, &enabled,
+			&bookingID, &bookingDate, &roleID, &roleName); err != nil {
 			return &models.Response{
 				Success:           false,
-				Message:           "Error scanning user email",
-				ErrorsDescription: fmt.Sprintf("error scanning user email: %v", err),
+				Message:           "Error scanning user data",
+				ErrorsDescription: fmt.Sprintf("error scanning user data: %v", err),
 			}, err
 		}
 
-		userResponse, err := s.GetUser(email)
-		if err != nil {
-			return &models.Response{
-				Success:           false,
-				Message:           "Error fetching user data",
-				ErrorsDescription: fmt.Sprintf("error fetching user data for %s: %v", email, err),
-			}, err
+		user, exists := userMap[email]
+		if !exists {
+			user = &models.UserResponse{
+				Email:                 email,
+				FirstName:             firstName,
+				LastName:              lastName,
+				Theme:                 theme,
+				Image:                 &imageValue.String,
+				CredentialsNonExpired: credentialsNonExpired,
+				AccountNonExpired:     accountNonExpired,
+				AccountNonLocked:      accountNonLocked,
+				Enabled:               enabled,
+				Bookings:              []models.Booking{},
+				Roles:                 []models.Role{},
+			}
+			userMap[email] = user
 		}
 
-		var userData models.UserResponse
-		err = mapstructure.Decode(userResponse.Data, &userData)
-		if err != nil {
-			return &models.Response{
-				Success:           false,
-				Message:           "Invalid data format",
-				ErrorsDescription: "Error converting user data",
-			}, fmt.Errorf("failed to decode user data for email %s: %v", email, err)
+		// Добавляем бронь, если есть
+		if bookingID != nil && bookingDate != nil {
+			user.Bookings = append(user.Bookings, models.Booking{
+				ID:   *bookingID,
+				Time: *bookingDate,
+			})
 		}
-		// Если bookings и roles nil — заменяем на пустые списки
-		if userData.Bookings == nil {
-			userData.Bookings = []models.Booking{}
+
+		// Добавляем роль, если есть
+		if roleID != nil && roleName != nil {
+			user.Roles = append(user.Roles, models.Role{
+				ID:        *roleID,
+				Authority: *roleName,
+			})
 		}
-		if userData.Roles == nil {
-			userData.Roles = []models.Role{}
-		}
-		users = append(users, userData)
 	}
 
-	// Проверяем на ошибки при обходе данных
 	if err := rows.Err(); err != nil {
 		return &models.Response{
 			Success:           false,
@@ -85,7 +106,12 @@ func (s *Service) GetAllUsers() (*models.Response, error) {
 		}, err
 	}
 
-	// Возвращаем успешный ответ с пользователями
+	// Преобразуем карту в слайс пользователей
+	var users []models.UserResponse
+	for _, user := range userMap {
+		users = append(users, *user)
+	}
+
 	return &models.Response{
 		Success:           true,
 		Message:           "Users fetched successfully",
@@ -204,6 +230,55 @@ func (s *Service) GetUser(email string) (*models.Response, error) {
 		Success:           true,
 		Message:           "User data fetched successfully",
 		Data:              map[string]models.UserResponse{"user": models.UserToUserResponse(userDTO)},
+		ErrorsDescription: nil,
+	}
+
+	return response, nil
+}
+
+func (s *Service) GetUserBookings(email string, page, size int) (*models.Response, error) {
+	var bookings []models.Booking
+
+	// Пагинация для бронирований
+	offset := page * size
+	bookingsQuery := `SELECT id, room_id, user_email, time FROM booking WHERE user_email = $1 LIMIT $2 OFFSET $3`
+	rows, err := s.DB.Query(bookingsQuery, email, size, offset)
+	if err != nil {
+		return &models.Response{
+			Success:           false,
+			Message:           "Error fetching booking data",
+			Data:              nil,
+			ErrorsDescription: err.Error(),
+		}, err
+	}
+	defer rows.Close()
+
+	// Обрабатываем бронирования
+	for rows.Next() {
+		var booking models.Booking
+		if err := rows.Scan(&booking.ID, &booking.Room.ID, &booking.User.Email, &booking.Time); err != nil {
+			return &models.Response{
+				Success:           false,
+				Message:           "Error reading booking data",
+				Data:              nil,
+				ErrorsDescription: err.Error(),
+			}, err
+		}
+		// Присваиваем объект пользователя (можно дополнительно извлечь его данные из базы, если нужно)
+		booking.User = models.UserDTO{Email: email} // Простейшее присваивание
+		bookings = append(bookings, booking)
+	}
+
+	// Если бронирований нет, возвращаем пустой срез
+	if len(bookings) == 0 {
+		bookings = []models.Booking{}
+	}
+
+	// Ответ с бронированиями
+	response := &models.Response{
+		Success:           true,
+		Message:           "User bookings fetched successfully",
+		Data:              map[string][]models.Booking{"bookings": bookings},
 		ErrorsDescription: nil,
 	}
 

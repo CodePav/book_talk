@@ -4,13 +4,11 @@
     <option name="autoReloadType" value="ALL" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="065fdbb0-2b36-430c-8d5c-9ea24522ff92" name="Changes" comment="add: users/ realisations">
+    <list default="true" id="065fdbb0-2b36-430c-8d5c-9ea24522ff92" name="Changes" comment="move token to middleware&#10;use sendJsonMessage everywhere">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/auth/handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/auth/handler.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/auth/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/auth/service.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/internal/users/handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/users/handler.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/internal/users/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/users/service.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/middleware/middleware.go" beforeDir="false" afterPath="$PROJECT_DIR$/middleware/middleware.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/main.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -137,7 +135,8 @@
     <MESSAGE value="initial commit" />
     <MESSAGE value="add: realisation auth/ refresh, access tokens&#10;add: users/&#10;ref: project structure" />
     <MESSAGE value="add: users/ realisations" />
-    <option name="LAST_COMMIT_MESSAGE" value="add: users/ realisations" />
+    <MESSAGE value="move token to middleware&#10;use sendJsonMessage everywhere" />
+    <option name="LAST_COMMIT_MESSAGE" value="move token to middleware&#10;use sendJsonMessage everywhere" />
   </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>

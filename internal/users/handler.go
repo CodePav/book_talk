@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 )
 
 type Handler struct {
@@ -56,6 +57,45 @@ func (h *Handler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 		mw.SendJSONResponse(w, response, http.StatusInternalServerError)
 		return
 	}
+	mw.SendJSONResponse(w, response, http.StatusOK)
+}
+
+func (h *Handler) GetUserBookings(w http.ResponseWriter, r *http.Request) {
+	// Получение параметров пагинации
+	pageStr := r.URL.Query().Get("page")
+	sizeStr := r.URL.Query().Get("size")
+
+	// Преобразуем параметры пагинации в числа
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 0 {
+		page = 0 // Если ошибка или отрицательное значение, ставим 0
+	}
+
+	size, err := strconv.Atoi(sizeStr)
+	if err != nil || size <= 0 {
+		size = 10 // По умолчанию 10 записей на странице
+	}
+
+	// Получаем текущего пользователя
+	email, ok := r.Context().Value("email").(string)
+	if !ok {
+		mw.SendJSONResponse(w, &models.Response{
+			Success: false, Message: "Unauthorized", ErrorsDescription: "Invalid email in context",
+		}, http.StatusUnauthorized)
+		return
+	}
+
+	// Получаем данные о пользователе и его бронированиях
+	response, err := h.UserService.GetUserBookings(email, page, size)
+	if err != nil {
+		mw.SendJSONResponse(w, &models.Response{
+			Success:           false,
+			Message:           "Error fetching user bookings",
+			ErrorsDescription: err.Error(),
+		}, http.StatusInternalServerError)
+		return
+	}
+
 	mw.SendJSONResponse(w, response, http.StatusOK)
 }
 

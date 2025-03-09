@@ -35,6 +35,7 @@ func main() {
 	usersRouter.HandleFunc("/me", mw.Protect(usersHandler.GetCurrentUser)).Methods("GET")
 	usersRouter.HandleFunc("/me", mw.Protect(usersHandler.UpdateUser)).Methods("PUT")
 	usersRouter.HandleFunc("/me", mw.Protect(usersHandler.DeleteUser)).Methods("DELETE")
+	usersRouter.HandleFunc("/me/bookings", mw.Protect(usersHandler.GetUserBookings)).Methods("GET")
 	usersRouter.HandleFunc("/me/image", mw.Protect(usersHandler.GetUserImage)).Methods("GET")
 	usersRouter.HandleFunc("/me/image", mw.Protect(usersHandler.UpdateUserImage)).Methods("PUT")
 	usersRouter.HandleFunc("/me/change-password", mw.Protect(usersHandler.ChangePassword)).Methods("PUT")

@@ -156,8 +156,17 @@ func (as *Service) RegisterUser(email, password, firstName, lastName string) (*m
 }
 
 func (as *Service) LoginUser(email, password string) (*models.Response, error) {
-	var hashedPassword string
-	err := as.DB.QueryRow("SELECT password FROM users WHERE email = $1", email).Scan(&hashedPassword)
+	var (
+		hashedPassword        string
+		credentialsNonExpired bool
+		accountNonExpired     bool
+		accountNonLocked      bool
+		enabled               bool
+	)
+
+	// Получаем хеш пароля и статус пользователя из базы данных
+	err := as.DB.QueryRow("SELECT password, credentials_non_expired, account_non_expired, account_non_locked, enabled FROM users WHERE email = $1", email).
+		Scan(&hashedPassword, &credentialsNonExpired, &accountNonExpired, &accountNonLocked, &enabled)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return &models.Response{
@@ -173,6 +182,40 @@ func (as *Service) LoginUser(email, password string) (*models.Response, error) {
 		}, nil
 	}
 
+	// Проверяем, активна ли учетная запись
+	if !credentialsNonExpired {
+		return &models.Response{
+			Success:           false,
+			Message:           "Произошла ошибка авторизации",
+			ErrorsDescription: []string{"учетные данные истекли"},
+		}, nil
+	}
+
+	if !accountNonExpired {
+		return &models.Response{
+			Success:           false,
+			Message:           "Произошла ошибка авторизации",
+			ErrorsDescription: []string{"аккаунт истек"},
+		}, nil
+	}
+
+	if !accountNonLocked {
+		return &models.Response{
+			Success:           false,
+			Message:           "Произошла ошибка авторизации",
+			ErrorsDescription: []string{"аккаунт заблокирован"},
+		}, nil
+	}
+
+	if !enabled {
+		return &models.Response{
+			Success:           false,
+			Message:           "Произошла ошибка авторизации",
+			ErrorsDescription: []string{"аккаунт не активирован"},
+		}, nil
+	}
+
+	// Сравниваем пароли
 	err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
 	if err != nil {
 		return &models.Response{
@@ -182,6 +225,7 @@ func (as *Service) LoginUser(email, password string) (*models.Response, error) {
 		}, nil
 	}
 
+	// Генерация токенов
 	accessToken, refreshToken, err := mw.GenerateTokens(email)
 	if err != nil {
 		return &models.Response{
@@ -191,7 +235,7 @@ func (as *Service) LoginUser(email, password string) (*models.Response, error) {
 		}, nil
 	}
 
-	// Return the success response with tokens
+	// Возвращаем успешный ответ с токенами
 	response := &models.Response{
 		Success:           true,
 		Message:           "Успешная авторизация",
