@@ -150,7 +150,7 @@ func (as *Service) RegisterUser(email, password, firstName, lastName string) (*m
 	}
 
 	// Создаем объект пользователя
-	user := models.ShortUserInfo{
+	user := models.ShortUserResponse{
 		Email:     email,
 		FirstName: firstName,
 		LastName:  lastName,
@@ -160,7 +160,7 @@ func (as *Service) RegisterUser(email, password, firstName, lastName string) (*m
 	response := &models.Response{
 		Success:           true,
 		Message:           "Успешно зарегестрирован",
-		Data:              map[string]models.ShortUserInfo{"user": user},
+		Data:              map[string]models.ShortUserResponse{"user": user},
 		ErrorsDescription: nil,
 	}
 

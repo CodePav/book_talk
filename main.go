@@ -4,6 +4,7 @@ import (
 	"book_talk/internal/auth"
 	"book_talk/internal/database"
 	"book_talk/internal/users"
+	"book_talk/middleware"
 	"log"
 	"net/http"
 
@@ -30,14 +31,14 @@ func main() {
 	authRouter.HandleFunc("/refresh", authHandler.Refresh).Methods("GET")
 
 	// Группа маршрутов для пользователей
-	usersRouter := r.PathPrefix("/api/v1/users").Subrouter()
-	usersRouter.HandleFunc("/me", usersHandler.GetCurrentUser).Methods("GET")
-	usersRouter.HandleFunc("/me", usersHandler.UpdateUser).Methods("PUT")
-	usersRouter.HandleFunc("/me/image", usersHandler.GetUserImage).Methods("GET")
-	usersRouter.HandleFunc("/me/image", usersHandler.UpdateUserImage).Methods("PUT")
-	usersRouter.HandleFunc("/me/change-password", usersHandler.ChangePassword).Methods("PUT")
-	usersRouter.HandleFunc("/me/bookings", usersHandler.GetUserBookingsPaginationHandler).Methods("GET")
-	usersRouter.HandleFunc("/me", usersHandler.DeleteUser).Methods("DELETE")
+	usersRouter := r.PathPrefix("/api/v1").Subrouter()
+	usersRouter.HandleFunc("/me", mw.Protect(usersHandler.GetCurrentUser)).Methods("GET")
+	usersRouter.HandleFunc("/me", mw.Protect(usersHandler.UpdateUser)).Methods("PUT")
+	usersRouter.HandleFunc("/me", mw.Protect(usersHandler.DeleteUser)).Methods("DELETE")
+	usersRouter.HandleFunc("/me/image", mw.Protect(usersHandler.GetUserImage)).Methods("GET")
+	usersRouter.HandleFunc("/me/image", mw.Protect(usersHandler.UpdateUserImage)).Methods("PUT")
+	usersRouter.HandleFunc("/me/change-password", mw.Protect(usersHandler.ChangePassword)).Methods("PUT")
+	usersRouter.HandleFunc("/users", mw.Protect(usersHandler.GetAllUsers)).Methods("GET")
 
 	// Запуск сервера
 	log.Println("Сервер запущен на порту 8080...")

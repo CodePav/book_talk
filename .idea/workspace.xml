@@ -4,53 +4,18 @@
     <option name="autoReloadType" value="ALL" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="065fdbb0-2b36-430c-8d5c-9ea24522ff92" name="Changes" comment="initial commit">
-      <change afterPath="$PROJECT_DIR$/.idea/dataSources.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/internal/auth/handler.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/internal/auth/service.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/internal/database/database.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/internal/models/models.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.env" beforeDir="false" afterPath="$PROJECT_DIR$/.env" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/auth/handler.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/auth/model.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/auth/repository.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/auth/routes.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/auth/service.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/bookings/handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/bookings/handler.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/bookings/model.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/bookings/repository.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/bookings/routes.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/bookings/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/bookings/service.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/roles/handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/roles/handler.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/roles/model.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/roles/repository.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/roles/routes.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/roles/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/roles/service.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/rooms/handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/rooms/handler.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/rooms/model.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/rooms/repository.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/rooms/routes.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/rooms/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/rooms/service.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/sections/handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/sections/handler.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/sections/model.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/sections/repository.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/sections/routes.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/sections/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/sections/service.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/users/handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/users/handler.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/users/model.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/users/repository.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/users/routes.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/features/users/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/users/service.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/go.mod" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/go.sum" beforeDir="false" afterPath="$PROJECT_DIR$/go.sum" afterDir="false" />
+    <list default="true" id="065fdbb0-2b36-430c-8d5c-9ea24522ff92" name="Changes" comment="add: realisation auth/ refresh, access tokens&#10;add: users/&#10;ref: project structure">
+      <change afterPath="$PROJECT_DIR$/internal/models/dto.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/middleware/middleware.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources/d02c3b70-d4b5-4d32-8ab4-74b22cf2f6d7.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources/d02c3b70-d4b5-4d32-8ab4-74b22cf2f6d7.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources/d02c3b70-d4b5-4d32-8ab4-74b22cf2f6d7/storage_v2/_src_/database/postgres.edMnLQ/schema/public.abK9xQ.meta" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources/d02c3b70-d4b5-4d32-8ab4-74b22cf2f6d7/storage_v2/_src_/database/postgres.edMnLQ/schema/public.abK9xQ.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/auth/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/auth/service.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/models/models.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/models/models.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/users/handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/users/handler.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/users/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/users/service.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pkg/config/config.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/pkg/config/openapi-spec.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/pkg/db/db.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/pkg/middleware/access.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/pkg/middleware/authentication.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/pkg/utils/errorHandler.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/pkg/utils/validators.go" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -161,10 +126,22 @@
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
   </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
   <component name="VcsManagerConfiguration">
     <option name="ADD_EXTERNAL_FILES_SILENTLY" value="true" />
     <MESSAGE value="initial commit" />
-    <option name="LAST_COMMIT_MESSAGE" value="initial commit" />
+    <MESSAGE value="add: realisation auth/ refresh, access tokens&#10;add: users/&#10;ref: project structure" />
+    <option name="LAST_COMMIT_MESSAGE" value="add: realisation auth/ refresh, access tokens&#10;add: users/&#10;ref: project structure" />
   </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>

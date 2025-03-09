@@ -11,6 +11,11 @@ type Response struct {
 	ErrorsDescription interface{} `json:"errorsDescription"`
 }
 
+type Pagination struct {
+	Page int `json:"page"`
+	Size int `json:"size"`
+}
+
 type Address struct {
 	ID       int    `json:"id"`
 	Region   string `json:"region"`   // Область
@@ -20,24 +25,24 @@ type Address struct {
 }
 
 type Booking struct {
-	ID   int    `json:"id"`
-	Room Room   `json:"room"` // Связь с комнатой
-	User User   `json:"user"` // Связь с пользователем
-	Time string `json:"time"` // Время бронирования в формате "YYYY-MM-DDTHH:MM:SSZ"
+	ID   int     `json:"id"`
+	Room Room    `json:"room"` // Связь с комнатой
+	User UserDTO `json:"user"` // Связь с пользователем
+	Time string  `json:"time"` // Время бронирования в формате "YYYY-MM-DDTHH:MM:SSZ"
 }
 
 type Department struct {
-	ID        int    `json:"id"`
-	Name      string `json:"name"`
-	ShortName string `json:"shortName"`
-	Color     string `json:"color"`
-	Users     []User `json:"users"` // Связь с пользователями
+	ID        int       `json:"id"`
+	Name      string    `json:"name"`
+	ShortName string    `json:"shortName"`
+	Color     string    `json:"color"`
+	Users     []UserDTO `json:"users"` // Связь с пользователями
 }
 
 type Role struct {
-	ID        int    `json:"id"`
-	Authority string `json:"authority"`
-	User      *User  `json:"user"` // nullable Связь с пользователем
+	ID        int      `json:"id"`
+	Authority string   `json:"authority"`
+	User      *UserDTO `json:"user"` // nullable Связь с пользователем
 }
 
 type Room struct {
@@ -65,24 +70,23 @@ type Weekday struct {
 	Active    bool   `json:"active"`
 }
 
-type ShortUserInfo struct {
+type ShortUserResponse struct {
 	Email     string `json:"email"`
 	FirstName string `json:"firstName"`
 	LastName  string `json:"lastName"`
 }
 
-type User struct {
-	Email                 string      `json:"email"`                 // Обязательное поле
-	FirstName             string      `json:"firstName"`             // Обязательное поле
-	LastName              string      `json:"lastName"`              // Обязательное поле
-	Password              string      `json:"password"`              // Обязательное поле
-	Department            *Department `json:"department"`            // Департамент (обязательное)
-	Image                 string      `json:"image,omitempty"`       // Изображение (опциональное)
-	Theme                 string      `json:"theme"`                 // Тема оформления (обязательное поле)
-	Bookings              []Booking   `json:"bookings"`              // Список бронирований
-	Roles                 []Role      `json:"roles"`                 // Роли пользователя
-	CredentialsNonExpired bool        `json:"credentialsNonExpired"` // Флаг, указывающий, что учетные данные не истекли
-	AccountNonExpired     bool        `json:"accountNonExpired"`     // Флаг, указывающий, что аккаунт не истек
-	AccountNonLocked      bool        `json:"accountNonLocked"`      // Флаг, указывающий, что аккаунт не заблокирован
-	Enabled               bool        `json:"enabled"`               // Флаг, указывающий, что аккаунт активен
+type UserResponse struct {
+	Email                 string      `json:"email"`
+	FirstName             string      `json:"firstName"`
+	LastName              string      `json:"lastName"`
+	Department            *Department `json:"department"`
+	Image                 *string     `json:"image"`
+	Theme                 string      `json:"theme"`
+	Bookings              []Booking   `json:"bookings"`
+	Roles                 []Role      `json:"roles"`
+	CredentialsNonExpired bool        `json:"credentialsNonExpired"`
+	AccountNonExpired     bool        `json:"accountNonExpired"`
+	AccountNonLocked      bool        `json:"accountNonLocked"`
+	Enabled               bool        `json:"enabled"`
 }
