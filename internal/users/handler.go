@@ -2,6 +2,7 @@ package users
 
 import (
 	"book_talk/internal/models"
+	mw "book_talk/middleware"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -20,199 +21,153 @@ func NewUsersHandler(db *sql.DB) *Handler {
 	}
 }
 
+// Получение всех пользователей
 func (h *Handler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
-	// Получаем всех пользователей
 	response, err := h.UserService.GetAllUsers()
 	if err != nil {
-		// Если произошла ошибка при получении данных
 		response = &models.Response{
 			Success:           false,
 			Message:           "Error fetching users",
-			Data:              nil,
-			ErrorsDescription: err.Error(), // Описание ошибки
+			ErrorsDescription: fmt.Sprintf("Service error: %v", err),
 		}
-		// Отправляем ошибочный ответ с кодом 500
-		w.WriteHeader(http.StatusInternalServerError)
-	} else {
-		// Если все прошло успешно, отправляем успешный ответ
-		w.WriteHeader(http.StatusOK)
+		mw.SendJSONResponse(w, response, http.StatusInternalServerError)
+		return
 	}
-
-	// Отправляем JSON-ответ
-	w.Header().Set("Content-Type", "application/json")
-	err = json.NewEncoder(w).Encode(response)
-	if err != nil {
-		// Если произошла ошибка при кодировании ответа
-		http.Error(w, "Error encoding response to JSON", http.StatusInternalServerError)
-	}
+	mw.SendJSONResponse(w, response, http.StatusOK)
 }
 
-// GetCurrentUser для получения текущего пользователя
+// Получение текущего пользователя
 func (h *Handler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
-	// Извлекаем email из контекста
-	email := r.Context().Value("email").(string)
+	email, ok := r.Context().Value("email").(string)
+	if !ok {
+		mw.SendJSONResponse(w, &models.Response{
+			Success: false, Message: "Unauthorized", ErrorsDescription: "Invalid email in context",
+		}, http.StatusUnauthorized)
+		return
+	}
 
 	response, err := h.UserService.GetUser(email)
 	if err != nil {
-		// Ошибка запроса или других операций
 		response = &models.Response{
 			Success:           false,
 			Message:           "Error fetching user data",
-			Data:              nil,
-			ErrorsDescription: err.Error(),
+			ErrorsDescription: fmt.Sprintf("Service error: %v", err),
 		}
+		mw.SendJSONResponse(w, response, http.StatusInternalServerError)
+		return
 	}
-
-	// Отправляем JSON-ответ
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	mw.SendJSONResponse(w, response, http.StatusOK)
 }
 
-// UpdateUser для обновления пользователя
+// Обновление пользователя
 func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	var updatedUser models.UserDTO
-
-	// Декодируем запрос, переданный от клиента
 	if err := json.NewDecoder(r.Body).Decode(&updatedUser); err != nil {
-		// В случае ошибки в теле запроса, отправляем ошибку
-		http.Error(w, "Invalid request body. Please check the structure of the data.", http.StatusBadRequest)
+		mw.SendJSONResponse(w, &models.Response{
+			Success: false, Message: "Invalid request body", ErrorsDescription: err.Error(),
+		}, http.StatusBadRequest)
 		return
 	}
 
-	// Обновляем пользователя через сервис
 	response, err := h.UserService.UpdateUser(updatedUser)
 	if err != nil {
-		// Если ошибка, отправляем статус 500 и сообщение об ошибке
-		http.Error(w, fmt.Sprintf("Error updating user: %s", err.Error()), http.StatusInternalServerError)
+		mw.SendJSONResponse(w, response, http.StatusInternalServerError)
 		return
 	}
-
-	// Устанавливаем заголовок типа контента и отправляем успешный ответ
-	w.Header().Set("Content-Type", "application/json")
-
-	// Обрабатываем ошибку при отправке ответа
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, fmt.Sprintf("Error encoding response: %s", err.Error()), http.StatusInternalServerError)
-		return
-	}
+	mw.SendJSONResponse(w, response, http.StatusOK)
 }
 
-// GetUserImage для получения изображения пользователя
+// Получение изображения пользователя
 func (h *Handler) GetUserImage(w http.ResponseWriter, r *http.Request) {
-	// Извлекаем email из контекста
-	email := r.Context().Value("email").(string)
-
-	// Получаем изображение через сервис
-	response, err := h.UserService.GetUserImage(email)
-	if err != nil {
-		// Отправляем ошибку, если что-то пошло не так
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(response)
+	email, ok := r.Context().Value("email").(string)
+	if !ok {
+		mw.SendJSONResponse(w, &models.Response{
+			Success: false, Message: "Unauthorized", ErrorsDescription: "Invalid email in context",
+		}, http.StatusUnauthorized)
 		return
 	}
 
-	// Если изображение успешно получено
+	response, err := h.UserService.GetUserImage(email)
+	if err != nil {
+		mw.SendJSONResponse(w, response, http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.WriteHeader(http.StatusOK)
 	w.Write(response.Data.([]byte))
 }
 
-// UpdateUserImage для обновления изображения пользователя
+// Обновление изображения пользователя
 func (h *Handler) UpdateUserImage(w http.ResponseWriter, r *http.Request) {
-	// Закрываем тело запроса после его обработки
 	defer r.Body.Close()
+	email, ok := r.Context().Value("email").(string)
+	if !ok {
+		mw.SendJSONResponse(w, &models.Response{
+			Success: false, Message: "Unauthorized", ErrorsDescription: "Invalid email in context",
+		}, http.StatusUnauthorized)
+		return
+	}
 
-	// Извлекаем email из контекста
-	email := r.Context().Value("email").(string)
-
-	// Чтение данных изображения из тела запроса
 	imageData, err := io.ReadAll(r.Body)
 	if err != nil {
-		// Возвращаем ошибку через Response, если не удается прочитать данные изображения
-		response := &models.Response{
-			Success:           false,
-			Message:           "Failed to read image data",
-			Data:              nil,
-			ErrorsDescription: fmt.Sprintf("Error reading image data: %v", err),
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(response)
+		mw.SendJSONResponse(w, &models.Response{
+			Success: false, Message: "Failed to read image data", ErrorsDescription: err.Error(),
+		}, http.StatusBadRequest)
 		return
 	}
 
-	// Вызываем сервис для обновления изображения
 	response, err := h.UserService.UpdateUserImage(imageData, email)
 	if err != nil {
-		// Возвращаем ошибку через Response, если не удается обновить изображение
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(response)
+		mw.SendJSONResponse(w, response, http.StatusInternalServerError)
 		return
 	}
-
-	// Отправляем успешный ответ
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	mw.SendJSONResponse(w, response, http.StatusOK)
 }
 
-// ChangePassword для смены пароля
+// Смена пароля
 func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
-	// Извлекаем email из контекста
-	email := r.Context().Value("email").(string)
+	email, ok := r.Context().Value("email").(string)
+	if !ok {
+		mw.SendJSONResponse(w, &models.Response{
+			Success: false, Message: "Unauthorized", ErrorsDescription: "Invalid email in context",
+		}, http.StatusUnauthorized)
+		return
+	}
 
 	var passwordData struct {
 		OldPassword string `json:"oldPassword"`
 		NewPassword string `json:"newPassword"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&passwordData); err != nil {
-		// Возвращаем ошибку через Response, если не удается декодировать тело запроса
-		response := &models.Response{
-			Success:           false,
-			Message:           "Invalid request body",
-			Data:              nil,
-			ErrorsDescription: fmt.Sprintf("Error reading request body: %v", err),
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(response)
+		mw.SendJSONResponse(w, &models.Response{
+			Success: false, Message: "Invalid request body", ErrorsDescription: err.Error(),
+		}, http.StatusBadRequest)
 		return
 	}
 
-	// Вызываем сервис для смены пароля
 	response, err := h.UserService.ChangePassword(passwordData.OldPassword, passwordData.NewPassword, email)
 	if err != nil {
-		// Возвращаем ошибку через Response, если не удается сменить пароль
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(response)
+		mw.SendJSONResponse(w, response, http.StatusInternalServerError)
 		return
 	}
-
-	// Отправляем успешный ответ
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	mw.SendJSONResponse(w, response, http.StatusOK)
 }
 
-// DeleteUser для удаления пользователя
+// Удаление пользователя
 func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
-	// Извлекаем email из контекста
-	email := r.Context().Value("email").(string)
-
-	// Вызываем сервис для удаления пользователя
-	response, err := h.UserService.DeleteUser(email)
-	if err != nil {
-		// Если ошибка при удалении, отправляем ответ с ошибкой
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(response)
+	email, ok := r.Context().Value("email").(string)
+	if !ok {
+		mw.SendJSONResponse(w, &models.Response{
+			Success: false, Message: "Unauthorized", ErrorsDescription: "Invalid email in context",
+		}, http.StatusUnauthorized)
 		return
 	}
 
-	// Отправляем успешный ответ
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusNoContent)
+	response, err := h.UserService.DeleteUser(email)
+	if err != nil {
+		mw.SendJSONResponse(w, response, http.StatusInternalServerError)
+		return
+	}
+	mw.SendJSONResponse(w, response, http.StatusNoContent)
 }

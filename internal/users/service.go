@@ -215,7 +215,11 @@ func (s *Service) UpdateUser(updatedUser models.UserDTO) (*models.Response, erro
 	// Начинаем транзакцию для атомарных изменений
 	tx, err := s.DB.Begin()
 	if err != nil {
-		return nil, err
+		return &models.Response{
+			Success:           false,
+			Message:           "Failed to start transaction",
+			ErrorsDescription: fmt.Sprintf("Transaction start error: %v", err),
+		}, err
 	}
 	defer tx.Rollback() // Откатить изменения в случае ошибки
 
@@ -234,57 +238,83 @@ func (s *Service) UpdateUser(updatedUser models.UserDTO) (*models.Response, erro
 		&user.AccountNonLocked, &user.Enabled,
 	)
 	if err != nil {
-		return nil, err
+		return &models.Response{
+			Success:           false,
+			Message:           "Failed to update user",
+			ErrorsDescription: fmt.Sprintf("Error updating user: %v", err),
+		}, err
 	}
 
 	// Обновляем департамент
 	_, err = tx.Exec(`UPDATE department SET name = $1, short_name = $2, color = $3 WHERE id = $4`,
 		updatedUser.Department.Name, updatedUser.Department.ShortName, updatedUser.Department.Color, updatedUser.Department.ID)
 	if err != nil {
-		return nil, err
+		return &models.Response{
+			Success:           false,
+			Message:           "Failed to update department",
+			ErrorsDescription: fmt.Sprintf("Error updating department: %v", err),
+		}, err
 	}
 
 	// Обновляем бронирования
 	_, err = tx.Exec(`DELETE FROM user_booking WHERE user_email = $1`, updatedUser.Email)
 	if err != nil {
-		return nil, err
+		return &models.Response{
+			Success:           false,
+			Message:           "Failed to delete old bookings",
+			ErrorsDescription: fmt.Sprintf("Error deleting bookings: %v", err),
+		}, err
 	}
 
 	for _, booking := range updatedUser.Bookings {
 		_, err = tx.Exec(`INSERT INTO user_booking (user_email, booking_id) VALUES ($1, $2)`, updatedUser.Email, booking.ID)
 		if err != nil {
-			return nil, err
+			return &models.Response{
+				Success:           false,
+				Message:           "Failed to insert new booking",
+				ErrorsDescription: fmt.Sprintf("Error inserting booking: %v", err),
+			}, err
 		}
 	}
 
 	// Обновляем роли
 	_, err = tx.Exec(`DELETE FROM user_role WHERE user_email = $1`, updatedUser.Email)
 	if err != nil {
-		return nil, err
+		return &models.Response{
+			Success:           false,
+			Message:           "Failed to delete old roles",
+			ErrorsDescription: fmt.Sprintf("Error deleting roles: %v", err),
+		}, err
 	}
 
 	for _, role := range updatedUser.Roles {
 		_, err = tx.Exec(`INSERT INTO user_role (user_email, role_id) VALUES ($1, $2)`, updatedUser.Email, role.ID)
 		if err != nil {
-			return nil, err
+			return &models.Response{
+				Success:           false,
+				Message:           "Failed to insert new role",
+				ErrorsDescription: fmt.Sprintf("Error inserting new role: %v", err),
+			}, err
 		}
 	}
 
 	// Завершаем транзакцию
 	err = tx.Commit()
 	if err != nil {
-		return nil, err
+		return &models.Response{
+			Success:           false,
+			Message:           "Failed to commit transaction",
+			ErrorsDescription: fmt.Sprintf("Transaction commit error: %v", err),
+		}, err
 	}
 
 	// Возвращаем успешный ответ с данными о пользователе
-	response := &models.Response{
+	return &models.Response{
 		Success:           true,
-		Message:           "UserDTO updated successfully",
+		Message:           "User updated successfully",
 		Data:              map[string]models.UserDTO{"user": user},
 		ErrorsDescription: nil,
-	}
-
-	return response, nil
+	}, nil
 }
 
 func (s *Service) GetUserImage(email string) (*models.Response, error) {

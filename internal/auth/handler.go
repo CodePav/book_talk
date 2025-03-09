@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"book_talk/internal/models"
+	mw "book_talk/middleware"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -25,21 +27,21 @@ func (ah *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Некорректный JSON", http.StatusBadRequest)
+		response := &models.Response{
+			Success: false,
+			Message: "Некорректный JSON",
+		}
+		mw.SendJSONResponse(w, response, http.StatusBadRequest)
 		return
 	}
 
 	response, err := ah.AuthService.RegisterUser(req.Email, req.Password, req.FirstName, req.LastName)
 	if err != nil {
-		// Here we return the error message from the response
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(response)
+		mw.SendJSONResponse(w, response, http.StatusInternalServerError)
 		return
 	}
 
-	// Return the response with user data
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
+	mw.SendJSONResponse(w, response, http.StatusCreated)
 }
 
 func (ah *Handler) Login(w http.ResponseWriter, r *http.Request) {
@@ -49,42 +51,40 @@ func (ah *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Некорректный JSON", http.StatusBadRequest)
+		response := &models.Response{
+			Success: false,
+			Message: "Некорректный JSON",
+		}
+		mw.SendJSONResponse(w, response, http.StatusBadRequest)
 		return
 	}
 
 	response, err := ah.AuthService.LoginUser(req.Email, req.Password)
 	if err != nil {
-		// Here we return the error message from the response
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(response)
+		mw.SendJSONResponse(w, response, http.StatusUnauthorized)
 		return
 	}
 
-	// Return the response with access tokens
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	mw.SendJSONResponse(w, response, http.StatusOK)
 }
 
 func (ah *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
-	// Извлекаем refreshToken из заголовков
 	refreshToken := r.Header.Get("Refresh-Token")
 
 	if refreshToken == "" {
-		http.Error(w, "Refresh-Token не найден в заголовках", http.StatusBadRequest)
+		response := &models.Response{
+			Success: false,
+			Message: "Refresh-Token не найден в заголовках",
+		}
+		mw.SendJSONResponse(w, response, http.StatusBadRequest)
 		return
 	}
 
-	// Проверяем и обновляем токен
 	response, err := ah.AuthService.RefreshToken(refreshToken)
 	if err != nil {
-		// Если ошибка при валидации токена, отправляем 401
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(response)
+		mw.SendJSONResponse(w, response, http.StatusUnauthorized)
 		return
 	}
 
-	// Если всё хорошо, возвращаем новый accessToken
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	mw.SendJSONResponse(w, response, http.StatusOK)
 }

@@ -6,11 +6,11 @@
   <component name="ChangeListManager">
     <list default="true" id="065fdbb0-2b36-430c-8d5c-9ea24522ff92" name="Changes" comment="add: users/ realisations">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/go.mod" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/go.sum" beforeDir="false" afterPath="$PROJECT_DIR$/go.sum" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/auth/handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/auth/handler.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/internal/auth/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/auth/service.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/internal/users/handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/users/handler.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/internal/users/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/users/service.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/middleware/middleware.go" beforeDir="false" afterPath="$PROJECT_DIR$/middleware/middleware.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
