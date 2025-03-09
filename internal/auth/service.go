@@ -215,8 +215,8 @@ func (as *Service) LoginUser(email, password string) (*models.Response, error) {
 }
 
 func GenerateTokens(email string) (string, string, error) {
-	accessExpiration := time.Now().Add(15 * time.Minute) // Access токен живет 15 минут
-	refreshExpiration := time.Now().Add(24 * time.Hour)  // Refresh токен живет 24 часа
+	accessExpiration := time.Now().Add(2 * time.Hour)   // Access токен живет 1 час
+	refreshExpiration := time.Now().Add(24 * time.Hour) // Refresh токен живет 24 часа
 
 	// Генерация access токена
 	accessToken, err := generateToken(email, accessExpiration, "access")
@@ -257,7 +257,7 @@ func ExtractAccessToken(r *http.Request) (string, error) {
 	// Получаем токен из заголовка Authorization
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		return "", fmt.Errorf("Authorization header not found")
+		return "", fmt.Errorf("authorization header not found")
 	}
 
 	// Понимаем, что формат должен быть "Bearer <access_token>"

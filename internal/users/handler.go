@@ -52,7 +52,7 @@ func (h *Handler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	// Извлекаем email из контекста
 	email := r.Context().Value("email").(string)
 
-	response, err := h.UserService.GetCurrentUser(email)
+	response, err := h.UserService.GetUser(email)
 	if err != nil {
 		// Ошибка запроса или других операций
 		response = &models.Response{

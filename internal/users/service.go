@@ -2,6 +2,8 @@ package users
 
 import (
 	"book_talk/internal/models"
+	"github.com/mitchellh/mapstructure"
+
 	"bytes"
 	"database/sql"
 	"errors"
@@ -21,50 +23,57 @@ func NewUsersService(db *sql.DB) *Service {
 }
 
 func (s *Service) GetAllUsers() (*models.Response, error) {
-	// Запрос для получения всех пользователей
-	query := `SELECT email, first_name, last_name, password, department_id, image, theme, 
-                     credentials_non_expired, account_non_expired, account_non_locked, enabled
-              FROM users`
+	// Получаем список email'ов пользователей
+	query := `SELECT email FROM users`
 	rows, err := s.DB.Query(query)
 	if err != nil {
-		// Возвращаем ошибку с описанием через Response
 		return &models.Response{
 			Success:           false,
-			Message:           "Error fetching users",
-			ErrorsDescription: fmt.Sprintf("error fetching users: %v", err),
-		}, nil
+			Message:           "Error fetching user emails",
+			ErrorsDescription: fmt.Sprintf("error fetching user emails: %v", err),
+		}, err
 	}
 	defer rows.Close()
 
 	var users []models.UserResponse
+	var email string
 
-	// Проходим по всем пользователям
+	// Обходим все email'ы и вызываем GetUser
 	for rows.Next() {
-		var userDTO models.UserDTO
-		var departmentID sql.NullInt64 // Для обработки NULL значений
-
-		// Сканируем информацию о пользователе
-		err := rows.Scan(
-			&userDTO.Email, &userDTO.FirstName, &userDTO.LastName, &userDTO.Password,
-			&departmentID, &userDTO.Image, &userDTO.Theme, &userDTO.CredentialsNonExpired,
-			&userDTO.AccountNonExpired, &userDTO.AccountNonLocked, &userDTO.Enabled,
-		)
-		if err != nil {
-			// Ошибка при сканировании данных
+		if err := rows.Scan(&email); err != nil {
 			return &models.Response{
 				Success:           false,
-				Message:           "Error scanning user data",
-				ErrorsDescription: fmt.Sprintf("error scanning user data: %v", err),
-			}, nil
+				Message:           "Error scanning user email",
+				ErrorsDescription: fmt.Sprintf("error scanning user email: %v", err),
+			}, err
 		}
 
-		// Если department_id не NULL, присваиваем департамент
-		if departmentID.Valid {
-			userDTO.Department = &models.Department{ID: int(departmentID.Int64)} // Присваиваем ID департаменту
+		userResponse, err := s.GetUser(email)
+		if err != nil {
+			return &models.Response{
+				Success:           false,
+				Message:           "Error fetching user data",
+				ErrorsDescription: fmt.Sprintf("error fetching user data for %s: %v", email, err),
+			}, err
 		}
 
-		// Добавляем пользователя в список
-		users = append(users, models.UserToUserResponse(userDTO))
+		var userData models.UserResponse
+		err = mapstructure.Decode(userResponse.Data, &userData)
+		if err != nil {
+			return &models.Response{
+				Success:           false,
+				Message:           "Invalid data format",
+				ErrorsDescription: "Error converting user data",
+			}, fmt.Errorf("failed to decode user data for email %s: %v", email, err)
+		}
+		// Если bookings и roles nil — заменяем на пустые списки
+		if userData.Bookings == nil {
+			userData.Bookings = []models.Booking{}
+		}
+		if userData.Roles == nil {
+			userData.Roles = []models.Role{}
+		}
+		users = append(users, userData)
 	}
 
 	// Проверяем на ошибки при обходе данных
@@ -73,22 +82,19 @@ func (s *Service) GetAllUsers() (*models.Response, error) {
 			Success:           false,
 			Message:           "Error during rows iteration",
 			ErrorsDescription: fmt.Sprintf("error during rows iteration: %v", err),
-		}, nil
+		}, err
 	}
 
-	// Формируем успешный ответ
-	response := &models.Response{
+	// Возвращаем успешный ответ с пользователями
+	return &models.Response{
 		Success:           true,
 		Message:           "Users fetched successfully",
 		Data:              users,
 		ErrorsDescription: nil,
-	}
-
-	// Возвращаем успешный ответ с данными
-	return response, nil
+	}, nil
 }
 
-func (s *Service) GetCurrentUser(email string) (*models.Response, error) {
+func (s *Service) GetUser(email string) (*models.Response, error) {
 	var userDTO models.UserDTO
 
 	// 1. Получаем основную информацию о пользователе
