@@ -1,6 +1,7 @@
 package users
 
 import (
+	"book_talk/internal/auth"
 	"book_talk/internal/models"
 	"database/sql"
 	"errors"
@@ -35,11 +36,7 @@ func (s *Service) GetAllUsers() (*models.Response, error) {
 
 	rows, err := s.DB.Query(query)
 	if err != nil {
-		return &models.Response{
-			Success:           false,
-			Message:           "Error fetching users",
-			ErrorsDescription: fmt.Sprintf("error fetching users: %v", err),
-		}, err
+		return nil, fmt.Errorf("ошибка при получении пользователей: %v", err)
 	}
 	defer rows.Close()
 
@@ -56,11 +53,7 @@ func (s *Service) GetAllUsers() (*models.Response, error) {
 			&credentialsNonExpired, &accountNonExpired,
 			&accountNonLocked, &enabled,
 			&bookingID, &bookingDate, &roleID, &roleName); err != nil {
-			return &models.Response{
-				Success:           false,
-				Message:           "Error scanning user data",
-				ErrorsDescription: fmt.Sprintf("error scanning user data: %v", err),
-			}, err
+			return nil, fmt.Errorf("ошибка при распознавании данных пользователя: %v", err)
 		}
 
 		user, exists := userMap[email]
@@ -81,7 +74,6 @@ func (s *Service) GetAllUsers() (*models.Response, error) {
 			userMap[email] = user
 		}
 
-		// Добавляем бронь, если есть
 		if bookingID != nil && bookingDate != nil {
 			user.Bookings = append(user.Bookings, models.Booking{
 				ID:   *bookingID,
@@ -89,7 +81,6 @@ func (s *Service) GetAllUsers() (*models.Response, error) {
 			})
 		}
 
-		// Добавляем роль, если есть
 		if roleID != nil && roleName != nil {
 			user.Roles = append(user.Roles, models.Role{
 				ID:        *roleID,
@@ -99,32 +90,25 @@ func (s *Service) GetAllUsers() (*models.Response, error) {
 	}
 
 	if err := rows.Err(); err != nil {
-		return &models.Response{
-			Success:           false,
-			Message:           "Error during rows iteration",
-			ErrorsDescription: fmt.Sprintf("error during rows iteration: %v", err),
-		}, err
+		return nil, fmt.Errorf("ошибка при обработке строк: %v", err)
 	}
 
-	// Преобразуем карту в слайс пользователей
 	var users []models.UserResponse
 	for _, user := range userMap {
 		users = append(users, *user)
 	}
 
 	return &models.Response{
-		Success:           true,
-		Message:           "Users fetched successfully",
-		Data:              users,
-		ErrorsDescription: nil,
+		Message: "Пользователи успешно получены",
+		Data:    users,
 	}, nil
 }
 
 func (s *Service) GetUser(email string) (*models.Response, error) {
 	var userDTO models.UserDTO
+	var departmentID sql.NullInt64
 
-	// 1. Получаем основную информацию о пользователе
-	var departmentID sql.NullInt64 // Используем sql.NullInt64 для обработки NULL значений
+	// Запрос для получения данных пользователя
 	query := `SELECT email, first_name, last_name, password, department_id, image, theme, 
                      credentials_non_expired, account_non_expired, account_non_locked, enabled
               FROM users WHERE email = $1`
@@ -135,108 +119,64 @@ func (s *Service) GetUser(email string) (*models.Response, error) {
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("no user found with email %s", email)
+			return nil, fmt.Errorf("пользователь с email %s не найден", email)
 		}
-		return nil, err
+		return nil, fmt.Errorf("ошибка при получении данных пользователя: %v", err)
 	}
 
-	// Если department_id не NULL, то выполняем запрос на получение департамента
+	// Получение данных о департаменте
 	if departmentID.Valid {
-		userDTO.Department = &models.Department{ID: int(departmentID.Int64)} // Присваиваем ID департаменту
-		// Получаем данные департамента из базы
+		userDTO.Department = &models.Department{ID: int(departmentID.Int64)}
 		departmentQuery := `SELECT id, name, short_name, color FROM department WHERE id = $1`
 		err = s.DB.QueryRow(departmentQuery, userDTO.Department.ID).Scan(
 			&userDTO.Department.ID, &userDTO.Department.Name, &userDTO.Department.ShortName, &userDTO.Department.Color,
 		)
 		if err != nil {
-			return &models.Response{
-				Success:           false,
-				Message:           "Error fetching department data",
-				Data:              nil,
-				ErrorsDescription: err.Error(),
-			}, err
+			return nil, fmt.Errorf("ошибка при получении данных департамента: %v", err)
 		}
 	}
 
-	// 2. Далее продолжаем обрабатывать бронирования и роли
-	// Получаем связанные бронирования
+	// Получение данных о бронированиях
 	bookingsQuery := `SELECT id, room_id, user_email, time FROM booking WHERE user_email = $1`
 	rows, err := s.DB.Query(bookingsQuery, userDTO.Email)
 	if err != nil {
-		return &models.Response{
-			Success:           false,
-			Message:           "Error fetching booking data",
-			Data:              nil,
-			ErrorsDescription: err.Error(),
-		}, err
+		return nil, fmt.Errorf("ошибка при получении данных о бронированиях: %v", err)
 	}
 	defer rows.Close()
 
-	// Обрабатываем бронирования
 	for rows.Next() {
 		var booking models.Booking
 		if err := rows.Scan(&booking.ID, &booking.Room.ID, &booking.User.Email, &booking.Time); err != nil {
-			return &models.Response{
-				Success:           false,
-				Message:           "Error reading booking data",
-				Data:              nil,
-				ErrorsDescription: err.Error(),
-			}, err
+			return nil, fmt.Errorf("ошибка при обработке данных о бронированиях: %v", err)
 		}
-		booking.User = userDTO // Присваиваем пользователя для бронирования
+		booking.User = userDTO
 		userDTO.Bookings = append(userDTO.Bookings, booking)
 	}
 
-	// Если бронирований нет, присваиваем пустой массив
-	if len(userDTO.Bookings) == 0 {
-		userDTO.Bookings = []models.Booking{}
-	}
-
-	// Получаем связанные роли
+	// Получение данных о ролях
 	rolesQuery := `SELECT id, authority FROM role WHERE user_email = $1`
 	rows, err = s.DB.Query(rolesQuery, userDTO.Email)
 	if err != nil {
-		return &models.Response{
-			Success:           false,
-			Message:           "Error fetching role data",
-			Data:              nil,
-			ErrorsDescription: err.Error(),
-		}, err
+		return nil, fmt.Errorf("ошибка при получении данных о ролях: %v", err)
 	}
 	defer rows.Close()
 
-	// Обрабатываем роли
 	for rows.Next() {
 		var role models.Role
 		if err := rows.Scan(&role.ID, &role.Authority); err != nil {
-			return &models.Response{
-				Success:           false,
-				Message:           "Error reading role data",
-				Data:              nil,
-				ErrorsDescription: err.Error(),
-			}, err
+			return nil, fmt.Errorf("ошибка при обработке данных о ролях: %v", err)
 		}
-		role.User = &userDTO // Присваиваем пользователя для роли
+		role.User = &userDTO
 		userDTO.Roles = append(userDTO.Roles, role)
 	}
 
-	// Если ролей нет, присваиваем пустой массив
-	if len(userDTO.Roles) == 0 {
-		userDTO.Roles = []models.Role{}
-	}
-
-	// Возвращаем успешный ответ с данными о пользователе
-	response := &models.Response{
-		Success:           true,
-		Message:           "User data fetched successfully",
-		Data:              map[string]models.UserResponse{"user": models.UserToUserResponse(userDTO)},
-		ErrorsDescription: nil,
-	}
-
-	return response, nil
+	return &models.Response{
+		Message: "Данные о пользователе успешно получены",
+		Data:    map[string]models.UserResponse{"user": models.UserToUserResponse(userDTO)},
+	}, nil
 }
 
-func (s *Service) GetUserBookings(email string, page, size int) (*models.Response, error) {
+func (s *Service) GetUserBookings(email string, page, size int) ([]models.Booking, error) {
 	var bookings []models.Booking
 
 	// Пагинация для бронирований
@@ -244,12 +184,7 @@ func (s *Service) GetUserBookings(email string, page, size int) (*models.Respons
 	bookingsQuery := `SELECT id, room_id, user_email, time FROM booking WHERE user_email = $1 LIMIT $2 OFFSET $3`
 	rows, err := s.DB.Query(bookingsQuery, email, size, offset)
 	if err != nil {
-		return &models.Response{
-			Success:           false,
-			Message:           "Error fetching booking data",
-			Data:              nil,
-			ErrorsDescription: err.Error(),
-		}, err
+		return nil, fmt.Errorf("ошибка при получении данных о бронированиях: %v", err)
 	}
 	defer rows.Close()
 
@@ -257,12 +192,7 @@ func (s *Service) GetUserBookings(email string, page, size int) (*models.Respons
 	for rows.Next() {
 		var booking models.Booking
 		if err := rows.Scan(&booking.ID, &booking.Room.ID, &booking.User.Email, &booking.Time); err != nil {
-			return &models.Response{
-				Success:           false,
-				Message:           "Error reading booking data",
-				Data:              nil,
-				ErrorsDescription: err.Error(),
-			}, err
+			return nil, fmt.Errorf("ошибка при чтении данных о бронированиях: %v", err)
 		}
 		// Присваиваем объект пользователя (можно дополнительно извлечь его данные из базы, если нужно)
 		booking.User = models.UserDTO{Email: email} // Простейшее присваивание
@@ -274,27 +204,14 @@ func (s *Service) GetUserBookings(email string, page, size int) (*models.Respons
 		bookings = []models.Booking{}
 	}
 
-	// Ответ с бронированиями
-	response := &models.Response{
-		Success:           true,
-		Message:           "User bookings fetched successfully",
-		Data:              map[string][]models.Booking{"bookings": bookings},
-		ErrorsDescription: nil,
-	}
-
-	return response, nil
+	return bookings, nil
 }
 
-// Обновить пользователя, департамент, бронирования и роли
-func (s *Service) UpdateUser(updatedUser models.UserDTO) (*models.Response, error) {
+func (s *Service) UpdateUser(updatedUser models.UserDTO) (*models.UserDTO, error) {
 	// Начинаем транзакцию для атомарных изменений
 	tx, err := s.DB.Begin()
 	if err != nil {
-		return &models.Response{
-			Success:           false,
-			Message:           "Failed to start transaction",
-			ErrorsDescription: fmt.Sprintf("Transaction start error: %v", err),
-		}, err
+		return nil, fmt.Errorf("не удалось начать транзакцию: %v", err)
 	}
 	defer tx.Rollback() // Откатить изменения в случае ошибки
 
@@ -313,83 +230,50 @@ func (s *Service) UpdateUser(updatedUser models.UserDTO) (*models.Response, erro
 		&user.AccountNonLocked, &user.Enabled,
 	)
 	if err != nil {
-		return &models.Response{
-			Success:           false,
-			Message:           "Failed to update user",
-			ErrorsDescription: fmt.Sprintf("Error updating user: %v", err),
-		}, err
+		return nil, fmt.Errorf("не удалось обновить пользователя: %v", err)
 	}
 
 	// Обновляем департамент
 	_, err = tx.Exec(`UPDATE department SET name = $1, short_name = $2, color = $3 WHERE id = $4`,
 		updatedUser.Department.Name, updatedUser.Department.ShortName, updatedUser.Department.Color, updatedUser.Department.ID)
 	if err != nil {
-		return &models.Response{
-			Success:           false,
-			Message:           "Failed to update department",
-			ErrorsDescription: fmt.Sprintf("Error updating department: %v", err),
-		}, err
+		return nil, fmt.Errorf("не удалось обновить департамент: %v", err)
 	}
 
 	// Обновляем бронирования
 	_, err = tx.Exec(`DELETE FROM user_booking WHERE user_email = $1`, updatedUser.Email)
 	if err != nil {
-		return &models.Response{
-			Success:           false,
-			Message:           "Failed to delete old bookings",
-			ErrorsDescription: fmt.Sprintf("Error deleting bookings: %v", err),
-		}, err
+		return nil, fmt.Errorf("не удалось удалить старые бронирования: %v", err)
 	}
 
 	for _, booking := range updatedUser.Bookings {
 		_, err = tx.Exec(`INSERT INTO user_booking (user_email, booking_id) VALUES ($1, $2)`, updatedUser.Email, booking.ID)
 		if err != nil {
-			return &models.Response{
-				Success:           false,
-				Message:           "Failed to insert new booking",
-				ErrorsDescription: fmt.Sprintf("Error inserting booking: %v", err),
-			}, err
+			return nil, fmt.Errorf("не удалось вставить новое бронирование: %v", err)
 		}
 	}
 
 	// Обновляем роли
 	_, err = tx.Exec(`DELETE FROM user_role WHERE user_email = $1`, updatedUser.Email)
 	if err != nil {
-		return &models.Response{
-			Success:           false,
-			Message:           "Failed to delete old roles",
-			ErrorsDescription: fmt.Sprintf("Error deleting roles: %v", err),
-		}, err
+		return nil, fmt.Errorf("не удалось удалить старые роли: %v", err)
 	}
 
 	for _, role := range updatedUser.Roles {
 		_, err = tx.Exec(`INSERT INTO user_role (user_email, role_id) VALUES ($1, $2)`, updatedUser.Email, role.ID)
 		if err != nil {
-			return &models.Response{
-				Success:           false,
-				Message:           "Failed to insert new role",
-				ErrorsDescription: fmt.Sprintf("Error inserting new role: %v", err),
-			}, err
+			return nil, fmt.Errorf("не удалось вставить новую роль: %v", err)
 		}
 	}
 
 	// Завершаем транзакцию
 	err = tx.Commit()
 	if err != nil {
-		return &models.Response{
-			Success:           false,
-			Message:           "Failed to commit transaction",
-			ErrorsDescription: fmt.Sprintf("Transaction commit error: %v", err),
-		}, err
+		return nil, fmt.Errorf("не удалось подтвердить транзакцию: %v", err)
 	}
 
-	// Возвращаем успешный ответ с данными о пользователе
-	return &models.Response{
-		Success:           true,
-		Message:           "User updated successfully",
-		Data:              map[string]models.UserDTO{"user": user},
-		ErrorsDescription: nil,
-	}, nil
+	// Возвращаем обновленного пользователя
+	return &user, nil
 }
 
 func (s *Service) GetUserImage(email string) (*models.Response, error) {
@@ -403,28 +287,22 @@ func (s *Service) GetUserImage(email string) (*models.Response, error) {
 		// Если ошибка в запросе
 		if errors.Is(err, sql.ErrNoRows) {
 			return &models.Response{
-				Success:           false,
-				Message:           "User not found",
-				Data:              nil,
-				ErrorsDescription: "No user found with the specified email",
-			}, err
+				Message: "User not found",
+				Data:    nil,
+			}, fmt.Errorf("user not found with email: %s", email)
 		}
 		return &models.Response{
-			Success:           false,
-			Message:           "Failed to get user image",
-			Data:              nil,
-			ErrorsDescription: err.Error(),
-		}, err
+			Message: "Failed to get user image",
+			Data:    nil,
+		}, fmt.Errorf("failed to get image from DB for user %s: %v", email, err)
 	}
 
 	// Проверка на наличие изображения
 	if !imageData.Valid {
 		return &models.Response{
-			Success:           false,
-			Message:           "Image not found",
-			Data:              nil,
-			ErrorsDescription: "User does not have an image",
-		}, fmt.Errorf("user image not found")
+			Message: "Image not found",
+			Data:    nil,
+		}, fmt.Errorf("no image found for user %s", email)
 	}
 
 	// Чтение изображения с файловой системы
@@ -434,26 +312,20 @@ func (s *Service) GetUserImage(email string) (*models.Response, error) {
 		// Ошибка при чтении файла
 		if os.IsNotExist(err) {
 			return &models.Response{
-				Success:           false,
-				Message:           "Image file does not exist",
-				Data:              nil,
-				ErrorsDescription: "File not found at the specified path",
-			}, err
+				Message: "Image file does not exist",
+				Data:    nil,
+			}, fmt.Errorf("image file does not exist at path: %s", imagePath)
 		}
 		return &models.Response{
-			Success:           false,
-			Message:           "Failed to read image file",
-			Data:              nil,
-			ErrorsDescription: err.Error(),
-		}, err
+			Message: "Failed to read image file",
+			Data:    nil,
+		}, fmt.Errorf("failed to read image file at %s: %v", imagePath, err)
 	}
 
 	// Возвращаем успешный ответ с изображением
 	return &models.Response{
-		Success:           true,
-		Message:           "User image retrieved successfully",
-		Data:              imgData, // Возвращаем изображение в виде []byte
-		ErrorsDescription: nil,
+		Message: "User image retrieved successfully",
+		Data:    imgData, // Возвращаем изображение в виде []byte
 	}, nil
 }
 
@@ -462,10 +334,8 @@ func (s *Service) UpdateUserImage(imageData []byte, email string) (*models.Respo
 	// Проверяем, что данные не пустые
 	if len(imageData) == 0 {
 		return &models.Response{
-			Success:           false,
-			Message:           "Invalid image data",
-			Data:              nil,
-			ErrorsDescription: "Image data is empty",
+			Message: "Invalid image data",
+			Data:    nil,
 		}, fmt.Errorf("empty image data")
 	}
 
@@ -474,10 +344,8 @@ func (s *Service) UpdateUserImage(imageData []byte, email string) (*models.Respo
 	allowedFormats := map[string]bool{"image/jpeg": true, "image/png": true}
 	if !allowedFormats[contentType] {
 		return &models.Response{
-			Success:           false,
-			Message:           "Unsupported image format",
-			Data:              nil,
-			ErrorsDescription: fmt.Sprintf("Only JPEG and PNG formats are allowed, got: %s", contentType),
+			Message: "Unsupported image format",
+			Data:    nil,
 		}, fmt.Errorf("unsupported image format: %s", contentType)
 	}
 
@@ -488,10 +356,8 @@ func (s *Service) UpdateUserImage(imageData []byte, email string) (*models.Respo
 	// Создаем директорию, если её нет
 	if err := os.MkdirAll("images", 0755); err != nil {
 		return &models.Response{
-			Success:           false,
-			Message:           "Failed to create image directory",
-			Data:              nil,
-			ErrorsDescription: fmt.Sprintf("Error creating image directory: %v", err),
+			Message: "Failed to create image directory",
+			Data:    nil,
 		}, err
 	}
 
@@ -499,10 +365,8 @@ func (s *Service) UpdateUserImage(imageData []byte, email string) (*models.Respo
 	err := os.WriteFile(imagePath, imageData, 0644)
 	if err != nil {
 		return &models.Response{
-			Success:           false,
-			Message:           "Failed to write image to disk",
-			Data:              nil,
-			ErrorsDescription: fmt.Sprintf("Error writing image to disk: %v", err),
+			Message: "Failed to write image to disk",
+			Data:    nil,
 		}, err
 	}
 
@@ -518,27 +382,21 @@ func (s *Service) UpdateUserImage(imageData []byte, email string) (*models.Respo
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return &models.Response{
-				Success:           false,
-				Message:           "User not found",
-				Data:              nil,
-				ErrorsDescription: "No user found with the specified email",
+				Message: "User not found",
+				Data:    nil,
 			}, err
 		}
 
 		return &models.Response{
-			Success:           false,
-			Message:           "Failed to update image path in database",
-			Data:              nil,
-			ErrorsDescription: fmt.Sprintf("Error updating image path: %v", err),
+			Message: "Failed to update image path in database",
+			Data:    nil,
 		}, err
 	}
 
 	// Возвращаем успешный ответ
 	return &models.Response{
-		Success:           true,
-		Message:           "Image updated successfully",
-		Data:              map[string]string{"imagePath": imagePath},
-		ErrorsDescription: nil,
+		Message: "Image updated successfully",
+		Data:    map[string]string{"imagePath": imagePath},
 	}, nil
 }
 
@@ -549,17 +407,13 @@ func (s *Service) ChangePassword(oldPassword, newPassword, email string) (*model
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return &models.Response{
-				Success:           false,
-				Message:           "User not found",
-				Data:              nil,
-				ErrorsDescription: "No user found with the specified email",
+				Message: "User not found",
+				Data:    nil,
 			}, fmt.Errorf("user not found")
 		}
 		return &models.Response{
-			Success:           false,
-			Message:           "Failed to fetch user password",
-			Data:              nil,
-			ErrorsDescription: fmt.Sprintf("Error fetching password: %v", err),
+			Message: "Failed to fetch user password",
+			Data:    nil,
 		}, err
 	}
 
@@ -567,31 +421,22 @@ func (s *Service) ChangePassword(oldPassword, newPassword, email string) (*model
 	err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(oldPassword))
 	if err != nil {
 		return &models.Response{
-			Success:           false,
-			Message:           "Incorrect old password",
-			Data:              nil,
-			ErrorsDescription: "Old password does not match",
+			Message: "Incorrect old password",
+			Data:    nil,
 		}, fmt.Errorf("incorrect old password")
 	}
 
-	// Проверяем сложность нового пароля (минимум 8 символов)
-	if len(newPassword) < 8 {
-		return &models.Response{
-			Success:           false,
-			Message:           "Password too short",
-			Data:              nil,
-			ErrorsDescription: "Password must be at least 8 characters long",
-		}, fmt.Errorf("password too short")
+	isValid, errPass := auth.IsValidPassword(newPassword)
+	if !isValid {
+		return nil, fmt.Errorf("invalid password: %v", errPass)
 	}
 
 	// Хэшируем новый пароль
 	newHashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return &models.Response{
-			Success:           false,
-			Message:           "Failed to hash new password",
-			Data:              nil,
-			ErrorsDescription: fmt.Sprintf("Error hashing password: %v", err),
+			Message: "Failed to hash new password",
+			Data:    nil,
 		}, err
 	}
 
@@ -599,19 +444,15 @@ func (s *Service) ChangePassword(oldPassword, newPassword, email string) (*model
 	_, err = s.DB.Exec(`UPDATE users SET password = $1 WHERE email = $2`, string(newHashedPassword), email)
 	if err != nil {
 		return &models.Response{
-			Success:           false,
-			Message:           "Failed to update password",
-			Data:              nil,
-			ErrorsDescription: fmt.Sprintf("Error updating password: %v", err),
+			Message: "Failed to update password",
+			Data:    nil,
 		}, err
 	}
 
 	// Возвращаем успешный ответ
 	return &models.Response{
-		Success:           true,
-		Message:           "Password changed successfully",
-		Data:              nil,
-		ErrorsDescription: nil,
+		Message: "Password changed successfully",
+		Data:    nil,
 	}, nil
 }
 
@@ -620,16 +461,15 @@ func (s *Service) DeleteUser(email string) (*models.Response, error) {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return &models.Response{
-			Success:           false,
-			Message:           "Failed to start transaction",
-			Data:              nil,
-			ErrorsDescription: fmt.Sprintf("Error starting transaction: %v", err),
+			Message: "Не удалось начать транзакцию",
+			Data:    nil,
 		}, err
 	}
-	// Если что-то пойдет не так — откатим изменения
+
+	// Откатываем изменения, если ошибка произойдет
 	defer func() {
 		if err != nil {
-			tx.Rollback()
+			_ = tx.Rollback() // Игнорируем ошибку при откате, если она есть
 		}
 	}()
 
@@ -639,17 +479,13 @@ func (s *Service) DeleteUser(email string) (*models.Response, error) {
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return &models.Response{
-				Success:           false,
-				Message:           "User not found",
-				Data:              nil,
-				ErrorsDescription: "No user found with the specified email",
-			}, fmt.Errorf("user not found")
+				Message: "Пользователь не найден",
+				Data:    nil,
+			}, fmt.Errorf("пользователь не найден")
 		}
 		return &models.Response{
-			Success:           false,
-			Message:           "Failed to fetch user data",
-			Data:              nil,
-			ErrorsDescription: fmt.Sprintf("Error fetching user data: %v", err),
+			Message: "Не удалось получить данные пользователя",
+			Data:    nil,
 		}, err
 	}
 
@@ -663,10 +499,8 @@ func (s *Service) DeleteUser(email string) (*models.Response, error) {
 		_, err = tx.Exec(query, email)
 		if err != nil {
 			return &models.Response{
-				Success:           false,
-				Message:           "Failed to delete user data",
-				Data:              nil,
-				ErrorsDescription: fmt.Sprintf("Error executing query: %v", err),
+				Message: "Не удалось удалить данные пользователя",
+				Data:    nil,
 			}, err
 		}
 	}
@@ -675,10 +509,8 @@ func (s *Service) DeleteUser(email string) (*models.Response, error) {
 	_, err = tx.Exec(`DELETE FROM users WHERE email = $1`, email)
 	if err != nil {
 		return &models.Response{
-			Success:           false,
-			Message:           "Failed to delete user",
-			Data:              nil,
-			ErrorsDescription: fmt.Sprintf("Error deleting user: %v", err),
+			Message: "Не удалось удалить пользователя",
+			Data:    nil,
 		}, err
 	}
 
@@ -686,7 +518,7 @@ func (s *Service) DeleteUser(email string) (*models.Response, error) {
 	if imagePath.Valid {
 		err = os.Remove(imagePath.String)
 		if err != nil {
-			log.Println("Failed to delete user image:", err)
+			log.Println("Не удалось удалить изображение пользователя:", err)
 		}
 	}
 
@@ -694,18 +526,14 @@ func (s *Service) DeleteUser(email string) (*models.Response, error) {
 	err = tx.Commit()
 	if err != nil {
 		return &models.Response{
-			Success:           false,
-			Message:           "Failed to commit transaction",
-			Data:              nil,
-			ErrorsDescription: fmt.Sprintf("Error committing transaction: %v", err),
+			Message: "Не удалось зафиксировать транзакцию",
+			Data:    nil,
 		}, err
 	}
 
 	// Возвращаем успешный ответ
 	return &models.Response{
-		Success:           true,
-		Message:           "User deleted successfully",
-		Data:              nil,
-		ErrorsDescription: nil,
+		Message: "Пользователь успешно удален",
+		Data:    nil,
 	}, nil
 }

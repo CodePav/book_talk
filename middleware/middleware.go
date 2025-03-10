@@ -27,9 +27,7 @@ func Protect(next http.HandlerFunc) http.HandlerFunc {
 		if err != nil {
 			// If the token is missing or invalid, send an error response with Response
 			response := models.Response{
-				Success:           false,
-				Message:           "Неверный или отсутствующий токен",
-				ErrorsDescription: []string{"Токен не передан или он неверен"},
+				Message: "Неверный или отсутствующий токен",
 			}
 			SendJSONResponse(w, &response, http.StatusUnauthorized)
 			return
@@ -40,9 +38,7 @@ func Protect(next http.HandlerFunc) http.HandlerFunc {
 		if err != nil {
 			// If the token is invalid, send an error response with Response
 			response := models.Response{
-				Success:           false,
-				Message:           "Невалидный токен",
-				ErrorsDescription: []string{"Токен истек или имеет неверный формат"},
+				Message: "Невалидный токен",
 			}
 			SendJSONResponse(w, &response, http.StatusUnauthorized)
 			return
@@ -150,6 +146,6 @@ func SendJSONResponse(w http.ResponseWriter, response *models.Response, statusCo
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, `{"success": false, "message": "Failed to encode response"}`, http.StatusInternalServerError)
+		http.Error(w, `{""message": "Failed to encode response"}`, http.StatusInternalServerError)
 	}
 }

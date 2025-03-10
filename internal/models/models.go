@@ -6,10 +6,8 @@ import (
 
 // Response represents a standard API response with a success flag, message, data, and error description.
 type Response struct {
-	Success           bool        `json:"success"`           // Indicates if the request was successful
-	Message           string      `json:"message"`           // A message associated with the response
-	Data              interface{} `json:"data"`              // The main data returned in the response
-	ErrorsDescription interface{} `json:"errorsDescription"` // Description of any errors encountered
+	Message string      `json:"message"` // A message associated with the response
+	Data    interface{} `json:"data"`    // The main data returned in the response
 }
 
 // Pagination represents pagination information for a list of results.

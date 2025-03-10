@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"golang.org/x/crypto/bcrypt"
+	"net/http"
 	"regexp"
+	"unicode"
 )
 
 type Service struct {
@@ -16,6 +18,78 @@ type Service struct {
 
 func NewAuthService(db *sql.DB) *Service {
 	return &Service{DB: db}
+}
+
+var (
+	ErrUserAlreadyExists = errors.New("пользователь с таким email уже существует")
+	ErrInvalidEmail      = errors.New("неверный формат email")
+	ErrInvalidPassword   = errors.New("пароль должен содержать минимум 5 символов")
+	ErrInvalidName       = errors.New("имя и фамилия могут содержать только буквы")
+)
+
+func (as *Service) RegisterUser(email, password, firstName, lastName string) (*models.Response, error) {
+	// Валидация входных данных
+	if email == "" {
+		return nil, errors.New("email не может быть пустым")
+	}
+	if password == "" {
+		return nil, errors.New("пароль не может быть пустым")
+	}
+	if firstName == "" {
+		return nil, errors.New("имя не может быть пустым")
+	}
+	if lastName == "" {
+		return nil, errors.New("фамилия не может быть пустой")
+	}
+
+	if !isValidEmail(email) {
+		return nil, ErrInvalidEmail
+	}
+	if !isValidName(firstName) || !isValidName(lastName) {
+		return nil, ErrInvalidName
+	}
+	// Проверка пароля
+	isValid, errPass := IsValidPassword(password)
+	if !isValid {
+		return nil, fmt.Errorf("invalid password: %v", errPass)
+	}
+
+	// Проверяем, существует ли пользователь
+	var existingEmail string
+	err := as.DB.QueryRow("SELECT email FROM users WHERE email = $1", email).Scan(&existingEmail)
+	if err == nil {
+		return nil, ErrUserAlreadyExists
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return nil, errors.New("ошибка при проверке email")
+	}
+
+	// Хешируем пароль
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, errors.New("ошибка хеширования пароля")
+	}
+
+	// Сохраняем пользователя в базе данных
+	_, err = as.DB.Exec("INSERT INTO users (email, password, first_name, last_name) VALUES ($1, $2, $3, $4)",
+		email, hashedPassword, firstName, lastName)
+	if err != nil {
+		return nil, errors.New("ошибка сохранения пользователя")
+	}
+
+	// Создаем объект пользователя
+	user := models.ShortUserResponse{
+		Email:     email,
+		FirstName: firstName,
+		LastName:  lastName,
+	}
+
+	// Возвращаем успешный ответ
+	response := &models.Response{
+		Message: "Успешно зарегистрирован",
+		Data:    map[string]models.ShortUserResponse{"user": user},
+	}
+
+	return response, nil
 }
 
 // Функция для валидации email
@@ -31,128 +105,31 @@ func isValidName(name string) bool {
 	return re.MatchString(name)
 }
 
-// Функция для валидации пароля
-func isValidPassword(password string) bool {
-	return len(password) >= 5
-}
-
-func (as *Service) RegisterUser(email, password, firstName, lastName string) (*models.Response, error) {
-	// Валидация пустых строк для каждого поля
-	if email == "" {
-		return &models.Response{
-			Success:           false,
-			Message:           "Произошла ошибки при регистрации",
-			ErrorsDescription: []string{"Email не может быть пустым"},
-		}, nil
+func IsValidPassword(password string) (bool, error) {
+	if len(password) < 5 {
+		return false, fmt.Errorf("password too short, minimum 5 characters required")
 	}
 
-	if password == "" {
-		return &models.Response{
-			Success:           false,
-			Message:           "Произошла ошибки при регистрации",
-			ErrorsDescription: []string{"Пароль не может быть пустым"},
-		}, nil
+	// Check for uppercase letter, lowercase letter, number, and special character
+	var hasUpper, hasLower, hasNumber, hasSpecial bool
+	for _, c := range password {
+		switch {
+		case unicode.IsUpper(c):
+			hasUpper = true
+		case unicode.IsLower(c):
+			hasLower = true
+		case unicode.IsDigit(c):
+			hasNumber = true
+		case !unicode.IsLetter(c) && !unicode.IsDigit(c):
+			hasSpecial = true
+		}
 	}
 
-	if firstName == "" {
-		return &models.Response{
-			Success:           false,
-			Message:           "Произошла ошибки при регистрации",
-			ErrorsDescription: []string{"Имя не может быть пустым"},
-		}, nil
+	if !hasUpper || !hasLower || !hasNumber || !hasSpecial {
+		return false, fmt.Errorf("password must contain an uppercase letter, lowercase letter, number, and special character")
 	}
 
-	if lastName == "" {
-		return &models.Response{
-			Success:           false,
-			Message:           "Произошла ошибки при регистрации",
-			ErrorsDescription: []string{"Фамилия не может быть пустой"},
-		}, nil
-	}
-
-	// Валидация email
-	if !isValidEmail(email) {
-		return &models.Response{
-			Success:           false,
-			Message:           "Произошла ошибки при регистрации",
-			ErrorsDescription: []string{"Неверный формат email"},
-		}, nil
-	}
-
-	// Валидация имени и фамилии
-	if !isValidName(firstName) || !isValidName(lastName) {
-		return &models.Response{
-			Success:           false,
-			Message:           "Произошла ошибки при регистрации",
-			ErrorsDescription: []string{"Имя и фамилия могут содержать только буквы"},
-		}, nil
-	}
-
-	// Валидация пароля
-	if !isValidPassword(password) {
-		return &models.Response{
-			Success:           false,
-			Message:           "Произошла ошибки при регистрации",
-			ErrorsDescription: []string{"Пароль должен содержать минимум 5 символов"},
-		}, nil
-	}
-
-	// Хешируем пароль
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return &models.Response{
-			Success:           false,
-			Message:           "Произошла ошибки при регистрации",
-			ErrorsDescription: []string{fmt.Sprintf("ошибка хеширования пароля: %v", err)},
-		}, nil
-	}
-
-	// Проверяем, существует ли уже пользователь с таким email
-	var existingEmail string
-	err = as.DB.QueryRow("SELECT email FROM users WHERE email = $1", email).Scan(&existingEmail)
-	if err == nil {
-		// Если err == nil, значит пользователь с таким email уже существует
-		return &models.Response{
-			Success:           false,
-			Message:           "Произошла ошибки при регистрации",
-			ErrorsDescription: []string{"Пользователь с таким email уже существует"},
-		}, nil
-	} else if !errors.Is(err, sql.ErrNoRows) {
-		// Если произошла другая ошибка, то возвращаем её
-		return &models.Response{
-			Success:           false,
-			Message:           "Произошла ошибки при регистрации",
-			ErrorsDescription: []string{fmt.Sprintf("ошибка при проверке email: %v", err)},
-		}, nil
-	}
-
-	// Сохраняем пользователя в базе данных
-	_, err = as.DB.Exec("INSERT INTO users (email, password, first_name, last_name) VALUES ($1, $2, $3, $4)",
-		email, hashedPassword, firstName, lastName)
-	if err != nil {
-		return &models.Response{
-			Success:           false,
-			Message:           "Произошла ошибки при регистрации",
-			ErrorsDescription: []string{fmt.Sprintf("ошибка сохранения пользователя: %v", err)},
-		}, nil
-	}
-
-	// Создаем объект пользователя
-	user := models.ShortUserResponse{
-		Email:     email,
-		FirstName: firstName,
-		LastName:  lastName,
-	}
-
-	// Возвращаем успешный ответ с данными о пользователе
-	response := &models.Response{
-		Success:           true,
-		Message:           "Успешно зарегестрирован",
-		Data:              map[string]models.ShortUserResponse{"user": user},
-		ErrorsDescription: nil,
-	}
-
-	return response, nil
+	return true, nil
 }
 
 func (as *Service) LoginUser(email, password string) (*models.Response, error) {
@@ -169,111 +146,71 @@ func (as *Service) LoginUser(email, password string) (*models.Response, error) {
 		Scan(&hashedPassword, &credentialsNonExpired, &accountNonExpired, &accountNonLocked, &enabled)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return &models.Response{
-				Success:           false,
-				Message:           "Произошла ошибка авторизации",
-				ErrorsDescription: []string{"пользователь не найден"},
-			}, nil
+			return nil, fmt.Errorf("пользователь не найден")
 		}
-		return &models.Response{
-			Success:           false,
-			Message:           "Произошла ошибка авторизации",
-			ErrorsDescription: []string{fmt.Sprintf("ошибка при поиске пользователя: %v", err)},
-		}, nil
+		return nil, fmt.Errorf("ошибка при поиске пользователя")
 	}
 
 	// Проверяем, активна ли учетная запись
 	if !credentialsNonExpired {
-		return &models.Response{
-			Success:           false,
-			Message:           "Произошла ошибка авторизации",
-			ErrorsDescription: []string{"учетные данные истекли"},
-		}, nil
+		return nil, fmt.Errorf("учетные данные недействительны")
 	}
 
 	if !accountNonExpired {
-		return &models.Response{
-			Success:           false,
-			Message:           "Произошла ошибка авторизации",
-			ErrorsDescription: []string{"аккаунт истек"},
-		}, nil
+		return nil, fmt.Errorf("аккаунт выведен недействителен")
 	}
 
 	if !accountNonLocked {
-		return &models.Response{
-			Success:           false,
-			Message:           "Произошла ошибка авторизации",
-			ErrorsDescription: []string{"аккаунт заблокирован"},
-		}, nil
+		return nil, fmt.Errorf("аккаунт заблокирован")
 	}
 
 	if !enabled {
-		return &models.Response{
-			Success:           false,
-			Message:           "Произошла ошибка авторизации",
-			ErrorsDescription: []string{"аккаунт не активирован"},
-		}, nil
+		return nil, fmt.Errorf("аккаунт не активирован")
 	}
 
 	// Сравниваем пароли
 	err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
 	if err != nil {
-		return &models.Response{
-			Success:           false,
-			Message:           "Произошла ошибка авторизации",
-			ErrorsDescription: []string{"неверный пароль"},
-		}, nil
+		return nil, fmt.Errorf("неверный пароль")
 	}
 
 	// Генерация токенов
 	accessToken, refreshToken, err := mw.GenerateTokens(email)
 	if err != nil {
-		return &models.Response{
-			Success:           false,
-			Message:           "Произошла ошибка авторизации",
-			ErrorsDescription: []string{fmt.Sprintf("ошибка при генерации токенов: %v", err)},
-		}, nil
+		return nil, fmt.Errorf("ошибка при генерации ключей авторизации")
 	}
 
 	// Возвращаем успешный ответ с токенами
-	response := &models.Response{
-		Success:           true,
-		Message:           "Успешная авторизация",
-		Data:              map[string]string{"accessToken": accessToken, "refreshToken": refreshToken},
-		ErrorsDescription: nil,
-	}
-
-	return response, nil
+	return &models.Response{
+		Message: "Успешная авторизация",
+		Data:    map[string]string{"accessToken": accessToken, "refreshToken": refreshToken},
+	}, nil
 }
 
-func (as *Service) RefreshToken(refreshToken string) (*models.Response, error) {
-	// Проверяем валидность refresh токена
-	email, err := mw.ValidateToken(refreshToken, "refresh") // Передаем "refresh" в качестве типа токена
+func (ah *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
+	// Получаем refreshToken из заголовков
+	refreshToken := r.Header.Get("Refresh-Token")
+
+	if refreshToken == "" {
+		// Если refreshToken отсутствует, отправляем ошибку с 400
+		response := &models.Response{
+			Message: "Refresh-Token не найден в заголовках",
+		}
+		mw.SendJSONResponse(w, response, http.StatusBadRequest)
+		return
+	}
+
+	// Пытаемся обновить токен
+	response, err := ah.AuthService.Refresh(refreshToken)
 	if err != nil {
-		return &models.Response{
-			Success:           false,
-			Message:           "Произошла ошибка обновления токена",
-			ErrorsDescription: []string{"Невалидный refresh токен"},
-		}, nil
+		// Если ошибка, отправляем ошибочный ответ с 401
+		response = &models.Response{
+			Message: err.Error(),
+		}
+		mw.SendJSONResponse(w, response, http.StatusUnauthorized)
+		return
 	}
 
-	// Генерируем новый accessToken
-	accessToken, _, err := mw.GenerateTokens(email)
-	if err != nil {
-		return &models.Response{
-			Success:           false,
-			Message:           "Произошла ошибка обновления токена",
-			ErrorsDescription: []string{fmt.Sprintf("ошибка при генерации токенов: %v", err)},
-		}, nil
-	}
-
-	// Возвращаем новый accessToken
-	response := &models.Response{
-		Success:           true,
-		Message:           "Токен обновлен",
-		Data:              map[string]string{"accessToken": accessToken},
-		ErrorsDescription: nil,
-	}
-
-	return response, nil
+	// Если все прошло успешно, отправляем новый accessToken с 200
+	mw.SendJSONResponse(w, response, http.StatusOK)
 }
