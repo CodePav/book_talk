@@ -4,14 +4,9 @@
     <option name="autoReloadType" value="ALL" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="065fdbb0-2b36-430c-8d5c-9ea24522ff92" name="Changes" comment="user: image">
+    <list default="true" id="065fdbb0-2b36-430c-8d5c-9ea24522ff92" name="Changes" comment="upd: error handling">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/internal/auth/handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/auth/handler.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/auth/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/auth/service.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/models/models.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/models/models.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/users/handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/users/handler.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/users/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/users/service.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/middleware/middleware.go" beforeDir="false" afterPath="$PROJECT_DIR$/middleware/middleware.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -141,7 +136,8 @@
     <MESSAGE value="move token to middleware&#10;use sendJsonMessage everywhere" />
     <MESSAGE value="doc: models.go" />
     <MESSAGE value="user: image" />
-    <option name="LAST_COMMIT_MESSAGE" value="user: image" />
+    <MESSAGE value="upd: error handling" />
+    <option name="LAST_COMMIT_MESSAGE" value="upd: error handling" />
   </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>

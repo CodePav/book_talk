@@ -45,7 +45,7 @@ func (ah *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, ErrInvalidEmail), errors.Is(err, ErrInvalidPassword), errors.Is(err, ErrInvalidName):
 			mw.SendJSONResponse(w, &models.Response{Message: err.Error()}, http.StatusBadRequest) // 400
 		default:
-			mw.SendJSONResponse(w, &models.Response{Message: "Внутренняя ошибка сервера"}, http.StatusInternalServerError) // 500
+			mw.SendJSONResponse(w, &models.Response{Message: "Внутренняя ошибка сервера:" + err.Error()}, http.StatusInternalServerError) // 500
 		}
 		return
 	}
